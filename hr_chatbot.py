@@ -51,7 +51,7 @@ def pick_sections(question):
 
 
 # ---------------------------------------------------------------- TODO 1: the reusable prompt
-PROMPT_TEMPLATE = """You are an expert HR assistant in Meridian Logistics. Answer this question: {{question}}"""
+PROMPT_TEMPLATE = """You are an expert HR assistant in Meridian Logistics. 
 # TODO 1: rewrite PROMPT_TEMPLATE using the Lab 1 instructions and these three placeholders:
 #   {{policy_version}}  {{policy_text}}  {{question}}
 HOW TO ANSWER
@@ -70,7 +70,7 @@ OUTPUT
 Return only valid JSON with these fields: answer, policy_section, answer_found, needs_human,
 escalation_reason.
 # It must tell the model to answer only from the policy text and to return the five JSON fields.
-
+Answer this question: {{question}}"""
 
 def build_prompt(question):
     ids = pick_sections(question)
