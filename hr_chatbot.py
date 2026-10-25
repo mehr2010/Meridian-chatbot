@@ -51,7 +51,7 @@ def pick_sections(question):
 
 
 # ---------------------------------------------------------------- TODO 1: the reusable prompt
-PROMPT_TEMPLATE = """You are an HR assistant. Answer this question: {{question}}"""
+PROMPT_TEMPLATE = """You are an expert HR assistant in Meridian Logistics. Answer this question: {{question}}"""
 # TODO 1: rewrite PROMPT_TEMPLATE using the Lab 1 instructions and these three placeholders:
 #   {{policy_version}}  {{policy_text}}  {{question}}
 HOW TO ANSWER
