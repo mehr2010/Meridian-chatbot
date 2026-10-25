@@ -13,15 +13,7 @@ import re
 
 import streamlit as st
 from openai import OpenAI
-from google import genai
 
-api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    st.error("No Gemini API key found. Add GEMINI_API_KEY to Streamlit Secrets.")
-    st.stop()
-
-client = genai.Client(api_key=api_key)
 
 # ---------------------------------------------------------------- settings
 POLICY_VERSION = "2026.1"
