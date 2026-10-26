@@ -48,54 +48,16 @@ POLICY = {
 # ============================================================
 
 KEYWORDS = {
-    "1.1": [
-        "annual leave",
-        "leave days",
-        "paid leave",
-        "paid leaves",
-        "vacation",
-        "leave entitlement",
-    ],
-    "1.2": [
-        "carry",
-        "unused leave",
-        "lapse",
-    ],
-    "1.3": [
-        "notice",
-        "days off",
-        "take leave",
-        "time off",
-        "consecutive days",
-    ],
-    "2.1": [
-        "sick",
-        "medical certificate",
-        "doctor note",
-        "doctor's note",
-    ],
-    "3.1": [
-        "working hours",
-        "start time",
-        "grace period",
-    ],
-    "3.2": [
-        "work from home",
-        "remote",
-        "wfh",
-    ],
-    "4.1": [
-        "insurance",
-        "parents",
-        "spouse",
-        "children",
-    ],
-    "5.1": [
-        "salary",
-        "colleague pay",
-        "personal data",
-    ],
+    "1.1": ["annual leave"],
+    "1.2": ["carry", "lapse"],
+    "1.3": ["notice", "days off", "take leave", "time off"],
+    "2.1": ["sick", "doctor", "medical"],
+    "3.1": ["working hours", "start time", "grace"],
+    "3.2": ["work from home", "remote", "wfh"],
+    "4.1": ["insurance"],
+    "5.1": ["salary", "pay"],
 }
+
 
 
 FIELDS = (
