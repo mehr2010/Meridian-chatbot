@@ -70,120 +70,64 @@ POLICY = {
 # ============================================================
 
 KEYWORDS = {
-    "1.1": ["annual leave", "leave days", "vacation"],
-    "1.2": ["carry", "lapse", "unused leave"],
-    "1.3": ["notice", "days off", "take leave", "time off"],
-    "2.1": ["sick", "doctor", "medical certificate"],
-    "3.1": ["working hours", "start time", "grace"],
-    "3.2": ["work from home", "remote", "wfh"],
-    "4.1": ["insurance", "parents", "spouse", "children"],
-    "5.1": ["salary", "pay", "personal data", "colleague"],
+    "1.1": [
+        "annual leave",
+        "leave days",
+        "paid leave",
+        "paid leaves",
+        "vacation",
+        "leave entitlement",
+    ],
+    "1.2": [
+        "carry",
+        "unused leave",
+        "lapse",
+    ],
+    "1.3": [
+        "notice",
+        "days off",
+        "take leave",
+        "time off",
+        "consecutive days",
+    ],
+    "2.1": [
+        "sick",
+        "medical certificate",
+        "doctor note",
+        "doctor's note",
+    ],
+    "3.1": [
+        "working hours",
+        "start time",
+        "grace period",
+    ],
+    "3.2": [
+        "work from home",
+        "remote",
+        "wfh",
+    ],
+    "4.1": [
+        "insurance",
+        "parents",
+        "spouse",
+        "children",
+    ],
+    "5.1": [
+        "salary",
+        "colleague pay",
+        "personal data",
+    ],
 }
 
 
-def pick_sections(question):
-    q = question.lower()
-
-    return [
-        sid
-        for sid, words in KEYWORDS.items()
-        if any(word in q for word in words)
-    ]
-
-
-# ============================================================
-# 4. GROUNDED HR PROMPT
-# ============================================================
-
-PROMPT_TEMPLATE = """
-You are an HR assistant at Meridian Logistics.
-
-POLICY VERSION:
-{{policy_version}}
-
-APPROVED HR POLICY:
-{{policy_text}}
-
-EMPLOYEE QUESTION:
-{{question}}
-
-INSTRUCTIONS:
-
-1. Answer ONLY using the approved HR policy.
-2. Do not invent policies, dates, numbers or rules.
-3. Answer in plain language using no more than 3 sentences.
-4. Include the supporting policy section.
-5. If the policy does not answer the question:
-   - Set answer_found to false.
-   - Set needs_human to true.
-   - Explain the reason.
-
-ALWAYS ESCALATE:
-- Complaints about managers or colleagues.
-- Harassment, grievances or pay disputes.
-- Termination and sensitive medical details.
-- Requests for another person's personal information.
-- Questions requiring unavailable system lookups.
-- Personal leave balance questions.
-
-NEVER:
-- Guess missing policy information.
-- Reveal another employee's personal data.
-- Repeat unnecessary personal identifiers.
-
-RETURN ONLY VALID JSON WITH THESE FIVE FIELDS:
-
-{
-    "answer": "string",
-    "policy_section": "string",
-    "answer_found": true,
-    "needs_human": false,
-    "escalation_reason": "string"
-}
-
-Use true or false for Boolean values.
-
-If answer_found is true, provide a supporting policy section.
-
-If no section supports the answer, use an empty string
-for policy_section.
-
-If needs_human is true, explain why in escalation_reason.
-
-Do not return Markdown or code fences.
-"""
-
-
-def build_prompt(question):
-    ids = pick_sections(question)
-
-    policy_text = "\n".join(
-        f"{sid} {POLICY[sid]}"
-        for sid in ids
-    )
-
-    if not policy_text:
-        policy_text = "(No matching policy section found.)"
-
-    return (
-        PROMPT_TEMPLATE
-        .replace("{{policy_version}}", POLICY_VERSION)
-        .replace("{{policy_text}}", policy_text)
-        .replace("{{question}}", question)
-    )
-
-
-# ============================================================
-# 5. RESPONSE VALIDATION
-# ============================================================
-
-FIELDS = [
+FIELDS = (
     "answer",
     "policy_section",
     "answer_found",
     "needs_human",
     "escalation_reason",
-]
+)
+
 
 SENSITIVE = [
     "unfair",
@@ -193,198 +137,132 @@ SENSITIVE = [
     "grievance",
     "fired",
     "terminat",
-    "salary",
-    "pay cut",
     "pay dispute",
-    "colleague",
+    "pay cut",
     "my manager",
     "leave balance",
     "remaining leave",
+    "my balance",
+    "colleague",
+    "coworker",
+    "co-worker",
+    "another employee",
+    "someone else",
+    "my salary",
+    "medical records",
 ]
 
 
-def clean(raw):
-    text = (raw or "").strip()
-
-    text = re.sub(
-        r"^```(?:json)?",
-        "",
-        text
-    ).strip()
-
-    text = re.sub(
-        r"```$",
-        "",
-        text
-    ).strip()
-
-    return text
-
-
-def validate(question, raw):
+def pick_sections(question):
     """
-    Validate JSON, policy sections, sensitive questions,
-    and numeric claims.
+    Find the approved HR policy sections that match
+    the employee's question.
     """
 
-    # RULE 1: Valid JSON and required fields
-    try:
-        data = json.loads(clean(raw))
-    except (json.JSONDecodeError, TypeError):
-        return None, "not valid JSON"
+    q = question.lower()
 
-    if not isinstance(data, dict):
-        return None, "not valid JSON"
-
-    if any(field not in data for field in FIELDS):
-        return None, "a required field is missing"
-
-    if (
-        not isinstance(data["answer"], str)
-        or not isinstance(data["policy_section"], str)
-        or type(data["answer_found"]) is not bool
-        or type(data["needs_human"]) is not bool
-        or not isinstance(data["escalation_reason"], str)
-    ):
-        return None, "a field has an invalid type"
-
-    # RULE 2: Validate cited policy sections
-    cited_sections = re.findall(
-        r"\d+\.\d+",
-        data["policy_section"]
-    )
-
-    allowed_sections = set(pick_sections(question))
-
-    if data["answer_found"]:
-        if not cited_sections:
-            return None, "policy section is missing"
-
-        if any(
-            section not in allowed_sections
-            for section in cited_sections
-        ):
-            return None, "unsupported policy section"
-
-    # RULE 3: Escalate sensitive questions
-    lower_question = question.lower()
-
-    if any(word in lower_question for word in SENSITIVE):
-        data["needs_human"] = True
-
-        if not data["escalation_reason"].strip():
-            data["escalation_reason"] = (
-                "This question requires human HR review."
-            )
-
-    if not data["answer_found"]:
-        data["needs_human"] = True
-
-        if not data["escalation_reason"].strip():
-            data["escalation_reason"] = (
-                "The approved policy does not clearly "
-                "answer this question."
-            )
-
-    # RULE 4: Validate numbers
-    if data["answer_found"]:
-        supported_text = question + " "
-
-        for section in cited_sections:
-            supported_text += POLICY[section] + " "
-
-        answer_numbers = re.findall(
-            r"\d+(?:\.\d+)?",
-            data["answer"]
-        )
-
-        supported_numbers = re.findall(
-            r"\d+(?:\.\d+)?",
-            supported_text
-        )
-
-        for number in answer_numbers:
-            if number not in supported_numbers:
-                return None, "answer contains an unsupported number"
-
-    return data, None
+    return [
+        sid
+        for sid, words in KEYWORDS.items()
+        if any(word in q for word in words)
+    ]
 
 
-# ============================================================
-# 6. HR ESCALATION MESSAGE
-# ============================================================
+def requires_hr(question):
+    """
+    Identify sensitive questions requiring HR review.
+    """
 
-def hr_message(question, data, problem=None):
-    section = "None"
-    reason = problem or "Human HR review required."
+    q = question.lower()
 
-    if data is not None:
-        section = data.get("policy_section") or "None"
-
-        reason = (
-            data.get("escalation_reason")
-            or problem
-            or "Human HR review required."
-        )
-
-    return (
-        f"Employee question: {question}\n"
-        f"Escalation reason: {reason}\n"
-        f"Policy section: {section}"
+    return any(
+        term in q
+        for term in SENSITIVE
     )
 
 
 # ============================================================
-# 7. GEMINI API KEY CONFIGURATION
+# 4. BUILD THE GROUNDED GEMINI PROMPT
+# ============================================================
+
+def build_prompt(question, ids):
+    policy_text = "\n".join(
+        f"{sid}: {POLICY[sid]}"
+        for sid in ids
+    )
+
+    return f"""
+You are the HR assistant for fictional Meridian Logistics.
+
+Policy version: {POLICY_VERSION}
+
+Only use the following approved policy sections:
+
+{policy_text}
+
+Employee question:
+{question}
+
+INSTRUCTIONS:
+
+1. Answer only from the supplied HR policy.
+2. Use no more than three sentences.
+3. Cite the supporting section ID in policy_section.
+4. Never invent policy information.
+5. Never guess numbers, dates, or company rules.
+6. Escalate complaints, disputes, private employee
+   information, and questions needing system lookups.
+7. If the policy does not answer the question,
+   set answer_found to false and needs_human to true.
+
+Return ONLY valid JSON with exactly these five fields:
+
+{{
+    "answer": "string",
+    "policy_section": "string",
+    "answer_found": true,
+    "needs_human": false,
+    "escalation_reason": "string"
+}}
+
+Use true and false as JSON Boolean values.
+
+If no approved policy answers the question,
+policy_section must be an empty string.
+
+Do not include Markdown or code fences.
+"""
+
+
+# ============================================================
+# 5. GEMINI API KEY
 # ============================================================
 
 def get_key():
     """
-    Read the API key from Streamlit Secrets first,
-    then from environment variables.
+    Read GEMINI_API_KEY securely.
+
+    First check Streamlit Secrets.
+    Then check environment variables.
     """
 
     try:
         key = st.secrets.get("GEMINI_API_KEY", "")
 
-        if key and str(key).strip():
+        if str(key).strip():
             return str(key).strip()
 
     except Exception:
         pass
 
-    key = os.environ.get("GEMINI_API_KEY", "")
-
-    return key.strip() or None
-
-
-def check_secret_status():
-    """
-    Safe diagnostic. Never displays the actual API key.
-    """
-
-    try:
-        found = "GEMINI_API_KEY" in st.secrets
-
-        if not found:
-            return "Secret name not found in Streamlit Secrets"
-
-        value = st.secrets.get("GEMINI_API_KEY", "")
-
-        if not str(value).strip():
-            return "Secret exists but its value is empty"
-
-        return "Secret found with a nonempty value"
-
-    except Exception as error:
-        return (
-            "Secrets could not be read: "
-            + type(error).__name__
-        )
+    return (
+        os.environ.get("GEMINI_API_KEY", "").strip()
+        or None
+    )
 
 
 # ============================================================
-# 8. GOOGLE GEMINI API CONNECTION
+# 6. CALL GOOGLE GEMINI
 # ============================================================
 
 def call_model(prompt):
@@ -405,15 +283,193 @@ def call_model(prompt):
     )
 
     if not response.text:
-        raise ValueError("Gemini returned an empty response")
+        raise ValueError(
+            "Gemini returned an empty response"
+        )
 
     return response.text
 
 
-RETRY_NOTE = """
-Return only valid JSON containing all five required fields.
-Do not include Markdown or code fences.
-"""
+# ============================================================
+# 7. VALIDATE GEMINI RESPONSE
+# ============================================================
+
+def validate(question, raw, allowed):
+    """
+    Validate:
+    1. JSON structure
+    2. Required fields
+    3. Policy citations
+    4. Numeric claims
+    5. Sensitive questions
+    """
+
+    # RULE 1: Parse JSON
+    try:
+        text = raw.strip()
+
+        text = re.sub(
+            r"^```(?:json)?",
+            "",
+            text
+        ).strip()
+
+        text = re.sub(
+            r"```$",
+            "",
+            text
+        ).strip()
+
+        data = json.loads(text)
+
+    except (ValueError, TypeError):
+        return None, "Invalid JSON"
+
+    # RULE 2: Check fields
+    if not isinstance(data, dict):
+        return None, "Incorrect JSON structure"
+
+    if set(data) != set(FIELDS):
+        return None, "Incorrect JSON fields"
+
+    text_fields = (
+        "answer",
+        "policy_section",
+        "escalation_reason",
+    )
+
+    boolean_fields = (
+        "answer_found",
+        "needs_human",
+    )
+
+    if any(
+        not isinstance(data[field], str)
+        for field in text_fields
+    ):
+        return None, "Incorrect JSON field types"
+
+    if any(
+        type(data[field]) is not bool
+        for field in boolean_fields
+    ):
+        return None, "Incorrect JSON field types"
+
+    # RULE 3: Check policy citations
+    if data["answer_found"]:
+        cited = re.findall(
+            r"\b\d+\.\d+\b",
+            data["policy_section"]
+        )
+
+        if not cited:
+            return None, "Missing policy section"
+
+        if any(
+            section not in allowed
+            for section in cited
+        ):
+            return None, "Unsupported policy section"
+
+        # RULE 4: Check numbers against cited policy
+        supported_text = (
+            question
+            + " "
+            + " ".join(POLICY[s] for s in cited)
+        )
+
+        supported_numbers = re.findall(
+            r"\b\d+(?:\.\d+)?\b",
+            supported_text
+        )
+
+        answer_numbers = re.findall(
+            r"\b\d+(?:\.\d+)?\b",
+            data["answer"]
+        )
+
+        if any(
+            number not in supported_numbers
+            for number in answer_numbers
+        ):
+            return None, "Unsupported number in answer"
+
+    else:
+        data["needs_human"] = True
+
+        if not data["escalation_reason"]:
+            data["escalation_reason"] = (
+                "The approved policy does not "
+                "answer this question."
+            )
+
+    # RULE 5: Sensitive questions
+    if requires_hr(question):
+        data["needs_human"] = True
+
+        if not data["escalation_reason"]:
+            data["escalation_reason"] = (
+                "Human HR review required."
+            )
+
+    return data, None
+
+
+# ============================================================
+# 8. DIRECT ANSWER FOR KNOWN ANNUAL LEAVE QUESTIONS
+# ============================================================
+
+def known_leave_answer(question, ids):
+    """
+    Answer straightforward annual leave entitlement
+    questions directly from approved policy 1.1.
+
+    This prevents simple known facts from being lost
+    because of a Gemini response or validation failure.
+    """
+
+    q = question.lower()
+
+    if "1.1" not in ids:
+        return None
+
+    if requires_hr(question):
+        return None
+
+    # Do not use this shortcut for other leave topics.
+    excluded_terms = [
+        "sick",
+        "carry",
+        "notice",
+        "remaining",
+        "balance",
+        "request",
+        "approve",
+    ]
+
+    if any(term in q for term in excluded_terms):
+        return None
+
+    entitlement_terms = [
+        "how many",
+        "number of",
+        "entitled",
+        "entitlement",
+    ]
+
+    if any(term in q for term in entitlement_terms):
+        return {
+            "answer": (
+                "You receive 20 paid annual leave days "
+                "per calendar year, accrued monthly."
+            ),
+            "policy_section": "1.1",
+            "answer_found": True,
+            "needs_human": False,
+            "escalation_reason": "",
+        }
+
+    return None
 
 
 # ============================================================
@@ -421,43 +477,108 @@ Do not include Markdown or code fences.
 # ============================================================
 
 def answer_question(question):
-    prompt = build_prompt(question)
+    """
+    Workflow:
+    1. Select policy sections.
+    2. Check sensitive questions.
+    3. Answer known annual leave questions.
+    4. Call Gemini for other matching questions.
+    5. Validate the Gemini response.
+    6. Retry once if validation fails.
+    """
 
-    data = None
-    problem = "no reply"
+    ids = pick_sections(question)
+
+    # Sensitive questions require HR.
+    if requires_hr(question):
+        return {
+            "answer": (
+                "This request needs review by HR."
+            ),
+            "policy_section": "",
+            "answer_found": False,
+            "needs_human": True,
+            "escalation_reason": (
+                "This is a sensitive or personal HR request."
+            ),
+        }, None
+
+    # No matching policy.
+    if not ids:
+        return {
+            "answer": (
+                "The available policy does not "
+                "cover this question."
+            ),
+            "policy_section": "",
+            "answer_found": False,
+            "needs_human": True,
+            "escalation_reason": (
+                "No matching approved policy section."
+            ),
+        }, None
+
+    # Directly answer known annual leave entitlement.
+    direct = known_leave_answer(question, ids)
+
+    if direct is not None:
+        return direct, None
+
+    # Ask Gemini for other policy questions.
+    prompt = build_prompt(question, ids)
+
+    problem = "No response"
 
     for attempt in range(2):
         try:
             if attempt == 0:
                 raw = call_model(prompt)
             else:
-                raw = call_model(prompt + RETRY_NOTE)
+                raw = call_model(
+                    prompt
+                    + "\nPlease correct the JSON "
+                    + "and policy citation."
+                )
 
         except Exception as error:
             return None, (
-                "Gemini request failed: "
-                f"{type(error).__name__}"
+                "Gemini API error: "
+                f"{type(error).__name__}. "
+                "Check the Streamlit app logs "
+                "for additional details."
             )
 
-        data, problem = validate(question, raw)
+        data, problem = validate(
+            question,
+            raw,
+            ids
+        )
 
         if problem is None:
-            break
+            return data, None
 
-        retry_problems = [
-            "not valid JSON",
-            "a required field is missing",
-            "a field has an invalid type",
-        ]
-
-        if problem not in retry_problems:
-            break
-
-    return data, problem
+    return None, (
+        "Gemini response validation failed: "
+        + problem
+    )
 
 
 # ============================================================
-# 10. STREAMLIT APPLICATION
+# 10. HR ESCALATION MESSAGE
+# ============================================================
+
+def hr_message(question, data):
+    return (
+        f"Employee question: {question}\n"
+        f"Escalation reason: "
+        f"{data['escalation_reason']}\n"
+        f"Policy section: "
+        f"{data['policy_section'] or 'None'}"
+    )
+
+
+# ============================================================
+# 11. STREAMLIT APPLICATION
 # ============================================================
 
 def main():
@@ -473,51 +594,19 @@ def main():
         f"policy version {POLICY_VERSION}."
     )
 
-    # --------------------------------------------------------
-    # API KEY CHECK AND SAFE DIAGNOSTIC
-    # --------------------------------------------------------
-
-    api_key = get_key()
-
-    if not api_key:
+    # Check Gemini API key.
+    if not get_key():
         st.error("Gemini API key not detected.")
 
-        st.write(
-            "Secrets diagnostic:",
-            check_secret_status()
-        )
-
         st.info(
-            "The application is running, but Gemini "
-            "cannot be used until the API key is available."
-        )
-
-        st.markdown(
-            """
-### Check your Streamlit Secrets
-
-Open the deployed app's Settings, then Secrets.
-
-The entry should be:
-
-```toml
-GEMINI_API_KEY = "YOUR_REAL_GEMINI_API_KEY"
-```
-
-Replace the placeholder with your actual key.
-
-Save the changes and reboot the app.
-
-Do not share your API key or upload it to GitHub.
-            """
+            "Open this app's Streamlit Community Cloud "
+            "Settings → Secrets and add GEMINI_API_KEY "
+            "with your actual key. Then reboot the app."
         )
 
         st.stop()
 
-    # --------------------------------------------------------
-    # INITIALIZE SESSION STATE
-    # --------------------------------------------------------
-
+    # Initialize session state.
     if "chat" not in st.session_state:
         st.session_state.chat = []
 
@@ -527,18 +616,12 @@ Do not share your API key or upload it to GitHub.
     if "last" not in st.session_state:
         st.session_state.last = None
 
-    # --------------------------------------------------------
-    # DISPLAY CHAT HISTORY
-    # --------------------------------------------------------
-
+    # Display chat history.
     for role, message in st.session_state.chat:
         with st.chat_message(role):
             st.write(message)
 
-    # --------------------------------------------------------
-    # EMPLOYEE QUESTION
-    # --------------------------------------------------------
-
+    # Receive employee question.
     question = st.chat_input("Ask an HR question")
 
     if question:
@@ -549,52 +632,49 @@ Do not share your API key or upload it to GitHub.
         with st.chat_message("user"):
             st.write(question)
 
-        # Call Gemini
-        with st.spinner("Checking HR policy..."):
+        # Run the HR workflow.
+        with st.spinner("Checking approved policy..."):
             data, problem = answer_question(question)
 
-        st.session_state.last = data
+        if problem:
+            # Technical errors are not HR escalations.
+            reply = (
+                "I could not complete the policy check "
+                "due to a technical issue. "
+                "Please try again."
+            )
 
-        # ----------------------------------------------------
-        # DISPLAY VALIDATED ANSWER
-        # ----------------------------------------------------
+            st.error(problem)
 
-        if (
-            problem is None
-            and data is not None
-            and data["answer_found"]
-            and data["answer"]
-        ):
+        elif data is not None:
+            st.session_state.last = data
+
             reply = data["answer"]
 
-            if data["policy_section"]:
+            if (
+                data["answer_found"]
+                and data["policy_section"]
+            ):
                 reply += (
                     "\n\nPolicy section: "
                     + data["policy_section"]
                 )
 
+            # Escalate only when HR review is needed.
             if data["needs_human"]:
                 st.session_state.queue.append(
                     hr_message(question, data)
                 )
 
                 reply += (
-                    "\n\nThis question has also been "
-                    "added to the demonstration HR queue."
+                    "\n\nAdded to the demonstration "
+                    "HR queue."
                 )
 
         else:
-            st.session_state.queue.append(
-                hr_message(question, data, problem)
-            )
+            reply = "No response was available."
 
-            reply = (
-                "I cannot confirm an answer from the "
-                "approved HR policy. Your question has "
-                "been added to the demonstration HR queue."
-            )
-
-        # Save and display reply
+        # Save assistant response.
         st.session_state.chat.append(
             ("assistant", reply)
         )
@@ -602,15 +682,12 @@ Do not share your API key or upload it to GitHub.
         with st.chat_message("assistant"):
             st.write(reply)
 
-    # --------------------------------------------------------
-    # HR ESCALATION SIDEBAR
-    # --------------------------------------------------------
-
+    # HR escalation sidebar.
     with st.sidebar:
         st.header("HR Queue")
 
         st.caption(
-            "Demonstration only. Entries are not "
+            "Demonstration only. No messages are "
             "sent to a real HR department."
         )
 
@@ -625,8 +702,9 @@ Do not share your API key or upload it to GitHub.
 
 
 # ============================================================
-# 11. START APPLICATION
+# 12. START APPLICATION
 # ============================================================
 
 if __name__ == "__main__":
     main()
+
