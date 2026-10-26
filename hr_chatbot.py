@@ -542,17 +542,9 @@ def hr_message(question, data):
 # ============================================================
 
 def main():
-    st.set_page_config(
-        page_title="Meridian HR Assistant",
-        page_icon="💬"
-    )
-
-    st.title("Meridian HR Assistant")
-
-    st.caption(
-        "Fictional company. Answers come only from "
-        f"policy version {POLICY_VERSION}."
-    )
+    st.set_page_config(page_title="Meridian HR assistant")
+    st.title("Meridian HR assistant")
+    st.caption(f"Fictional company. Answers come only from policy version {POLICY_VERSION}.")
 
     # --------------------------------------------------------
     # CHECK API KEY
