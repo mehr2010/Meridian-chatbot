@@ -28,44 +28,19 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 # ============================================================
 # 2. APPROVED HR POLICIES
 # ============================================================
-
 POLICY = {
-    "1.1": (
-        "Annual leave: 20 paid days per calendar year, "
-        "accrued monthly."
-    ),
-    "1.2": (
-        "Carry forward: Up to 5 unused annual leave days "
-        "carry into the next year; the rest lapse on 31 March."
-    ),
-    "1.3": (
-        "Leave notice: 1 to 5 days require 3 working days' "
-        "notice. More than 5 consecutive days require "
-        "14 days' notice. All annual leave needs "
-        "line manager approval."
-    ),
-    "2.1": (
-        "Sick leave: 10 paid days per year. "
-        "A medical certificate is required for absences "
-        "of 2 or more consecutive days."
-    ),
-    "3.1": (
-        "Working hours: 9:00 to 18:00, Monday to Friday, "
-        "with a 15-minute grace period."
-    ),
-    "3.2": (
-        "Remote work: Up to 2 days per week with line "
-        "manager approval. Additional days need HR approval."
-    ),
-    "4.1": (
-        "Health insurance: Covers the employee, spouse "
-        "and up to 2 children."
-    ),
-    "5.1": (
-        "Confidentiality: HR does not disclose other "
-        "employees' pay or personal data."
-    ),
+    "1.1": "Annual leave: 20 paid days per calendar year, accrued monthly.",
+    "1.2": "Carry forward: Up to 5 unused annual leave days carry into the next year; the rest lapse on 31 March.",
+    "1.3": "Leave notice: 1 to 5 days: 3 working days' notice. More than 5 consecutive days: 14 days' notice. "
+           "All annual leave needs line manager approval.",
+    "2.1": "Sick leave: 10 paid days per year. A medical certificate is required for absences of "
+           "2 or more consecutive days.",
+    "3.1": "Working hours: 9:00 to 18:00, Monday to Friday, with a 15-minute grace period.",
+    "3.2": "Remote work: Up to 2 days per week with line manager approval. Additional days need HR approval.",
+    "4.1": "Health insurance: Covers the employee, spouse and up to 2 children.",
+    "5.1": "Confidentiality: HR does not disclose other employees' pay or personal data.",
 }
+
 
 
 # ============================================================
