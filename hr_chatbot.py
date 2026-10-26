@@ -497,11 +497,9 @@ def main():
                  "Secrets configuration error:",
                  type(error).__name__
              )
-        
-
-        st.error("DIAGNOSTIC TEST 123: Gemini key not detected")
-            
-        st.stop()
+             st.error("DIAGNOSTIC TEST 123: Gemini key not detected")
+             st.stop()
+             
 
     # Initialize chat and HR queue.
 
