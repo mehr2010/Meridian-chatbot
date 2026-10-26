@@ -488,12 +488,8 @@ def main():
 
     if not get_key():
 
-        st.error(
-            "No Gemini API key found. "
-            "Add GEMINI_API_KEY to Streamlit Secrets, "
-            "then reboot the app."
-        )
-
+        st.error("DIAGNOSTIC TEST 123: Gemini key not detected")
+            
         st.stop()
 
     # Initialize chat and HR queue.
