@@ -487,6 +487,18 @@ def main():
     # Check Gemini API key.
 
     if not get_key():
+        try:
+        st.write(
+            "Streamlit Secrets accessible:",
+            "GEMINI_API_KEY" in st.secrets
+        )
+            
+
+        except Exception as error:
+        st.write(
+            "Secrets configuration error:",
+            type(error).__name__
+        )
 
         st.error("DIAGNOSTIC TEST 123: Gemini key not detected")
             
