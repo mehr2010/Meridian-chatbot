@@ -1,12 +1,11 @@
-
 """
 Meridian Logistics HR Assistant
 AI DataYard - Module 2, Lab 4
 
 Google Gemini + Streamlit
-Fictional HR policies for demonstration purposes.
+Fictional HR policy chatbot.
 
-All chatbot responses are displayed as structured JSON.
+All answers use five-field JSON.
 """
 
 import json
@@ -28,37 +27,49 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 # ============================================================
 # 2. APPROVED HR POLICIES
 # ============================================================
+
 POLICY = {
-    "1.1": "Annual leave: 20 paid days per calendar year, accrued monthly.",
-    "1.2": "Carry forward: Up to 5 unused annual leave days carry into the next year; the rest lapse on 31 March.",
-    "1.3": "Leave notice: 1 to 5 days: 3 working days' notice. More than 5 consecutive days: 14 days' notice. "
-           "All annual leave needs line manager approval.",
-    "2.1": "Sick leave: 10 paid days per year. A medical certificate is required for absences of "
-           "2 or more consecutive days.",
-    "3.1": "Working hours: 9:00 to 18:00, Monday to Friday, with a 15-minute grace period.",
-    "3.2": "Remote work: Up to 2 days per week with line manager approval. Additional days need HR approval.",
-    "4.1": "Health insurance: Covers the employee, spouse and up to 2 children.",
-    "5.1": "Confidentiality: HR does not disclose other employees' pay or personal data.",
+    "1.1": (
+        "Annual leave: 20 paid days per calendar year, "
+        "accrued monthly."
+    ),
+    "1.2": (
+        "Carry forward: Up to 5 unused annual leave days "
+        "carry into the next year; the rest lapse on 31 March."
+    ),
+    "1.3": (
+        "Leave notice: 1 to 5 days require 3 working days' "
+        "notice. More than 5 consecutive days require "
+        "14 days' notice. All annual leave needs "
+        "line manager approval."
+    ),
+    "2.1": (
+        "Sick leave: 10 paid days per year. "
+        "A medical certificate is required for absences "
+        "of 2 or more consecutive days."
+    ),
+    "3.1": (
+        "Working hours: 9:00 to 18:00, Monday to Friday, "
+        "with a 15-minute grace period."
+    ),
+    "3.2": (
+        "Remote work: Up to 2 days per week with line "
+        "manager approval. Additional days need HR approval."
+    ),
+    "4.1": (
+        "Health insurance: Covers the employee, spouse "
+        "and up to 2 children."
+    ),
+    "5.1": (
+        "Confidentiality: HR does not disclose other "
+        "employees' pay or personal data."
+    ),
 }
 
 
-
 # ============================================================
-# 3. KEYWORD MATCHING
+# 3. RESPONSE STRUCTURE
 # ============================================================
-
-KEYWORDS = {
-    "1.1": ["annual leave"],
-    "1.2": ["carry", "lapse"],
-    "1.3": ["notice", "days off", "take leave", "time off"],
-    "2.1": ["sick", "doctor", "medical"],
-    "3.1": ["working hours", "start time", "grace"],
-    "3.2": ["work from home", "remote", "wfh"],
-    "4.1": ["insurance"],
-    "5.1": ["salary", "pay"],
-}
-
-
 
 FIELDS = (
     "answer",
@@ -69,34 +80,6 @@ FIELDS = (
 )
 
 
-SENSITIVE = [
-    "unfair",
-    "harass",
-    "complain",
-    "complaint",
-    "grievance",
-    "fired",
-    "terminat",
-    "pay dispute",
-    "pay cut",
-    "my manager",
-    "leave balance",
-    "remaining leave",
-    "my balance",
-    "colleague",
-    "coworker",
-    "co-worker",
-    "another employee",
-    "someone else",
-    "my salary",
-    "medical records",
-]
-
-
-# ============================================================
-# 4. HELPER FUNCTIONS
-# ============================================================
-
 def make_response(
     answer,
     policy_section="",
@@ -104,10 +87,6 @@ def make_response(
     needs_human=False,
     escalation_reason=""
 ):
-    """
-    Create a consistent JSON-compatible dictionary.
-    """
-
     return {
         "answer": answer,
         "policy_section": policy_section,
@@ -117,38 +96,7 @@ def make_response(
     }
 
 
-def pick_sections(question):
-    """
-    Find policy sections matching the employee question.
-    """
-
-    q = question.lower()
-
-    return [
-        sid
-        for sid, words in KEYWORDS.items()
-        if any(word in q for word in words)
-    ]
-
-
-def requires_hr(question):
-    """
-    Detect sensitive requests requiring human HR review.
-    """
-
-    q = question.lower()
-
-    return any(
-        term in q
-        for term in SENSITIVE
-    )
-
-
 def format_json(data):
-    """
-    Convert response dictionary into formatted JSON.
-    """
-
     return json.dumps(
         data,
         indent=2,
@@ -157,7 +105,358 @@ def format_json(data):
 
 
 # ============================================================
-# 5. BUILD GEMINI PROMPT
+# 4. QUESTION NORMALIZATION AND MATCHING
+# ============================================================
+
+def normalize(question):
+    text = question.lower().strip()
+    text = text.replace("’", "'")
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+KEYWORDS = {
+    "1.1": [
+        "annual leave",
+        "paid leave",
+        "paid leaves",
+        "vacation",
+        "leave entitlement",
+        "leave days",
+    ],
+    "1.2": [
+        "carry forward",
+        "carry over",
+        "unused leave",
+        "lapse",
+    ],
+    "1.3": [
+        "leave notice",
+        "notice period",
+        "days off",
+        "take leave",
+        "time off",
+    ],
+    "2.1": [
+        "sick",
+        "medical certificate",
+        "doctor's note",
+        "doctor note",
+    ],
+    "3.1": [
+        "working hours",
+        "office hours",
+        "start time",
+        "grace period",
+    ],
+    "3.2": [
+        "work from home",
+        "working from home",
+        "remote",
+        "wfh",
+    ],
+    "4.1": [
+        "insurance",
+        "health coverage",
+        "medical coverage",
+    ],
+    "5.1": [
+        "confidentiality",
+        "personal data",
+        "another employee's pay",
+    ],
+}
+
+
+def pick_sections(question):
+    q = normalize(question)
+
+    matched = [
+        section
+        for section, words in KEYWORDS.items()
+        if any(word in q for word in words)
+    ]
+
+    return matched
+
+
+# ============================================================
+# 5. HUMAN HR REVIEW
+# ============================================================
+
+SENSITIVE = [
+    "harass",
+    "grievance",
+    "complaint",
+    "unfair treatment",
+    "pay dispute",
+    "pay cut",
+    "my salary",
+    "leave balance",
+    "remaining leave",
+    "my balance",
+    "my manager",
+    "termination",
+    "fired",
+    "medical records",
+    "another employee",
+    "colleague's salary",
+]
+
+
+def requires_hr(question):
+    q = normalize(question)
+
+    return any(
+        term in q
+        for term in SENSITIVE
+    )
+
+
+# ============================================================
+# 6. TOPIC-SPECIFIC POLICY ANSWERS
+# ============================================================
+
+def maternity_answer():
+    return make_response(
+        answer=(
+            "I could not find a maternity leave policy "
+            "in the HR policy provided to me, so I can't "
+            "give you details. I'd recommend contacting "
+            "HR directly for accurate information on "
+            "maternity leave."
+        ),
+        policy_section="",
+        answer_found=False,
+        needs_human=True,
+        escalation_reason=(
+            f"The provided policy (version {POLICY_VERSION}) "
+            "has no section on maternity leave, so the "
+            "question must be answered by HR."
+        )
+    )
+
+
+def annual_leave_answer():
+    return make_response(
+        answer=(
+            "You get 20 paid annual leave days per "
+            "calendar year, accrued monthly."
+        ),
+        policy_section="1.1",
+        answer_found=True,
+        needs_human=False,
+        escalation_reason=""
+    )
+
+
+def remote_work_answer(days=None):
+    if days is not None and days > 2:
+        if days == 3:
+            answer = (
+                "You can work from home up to 2 days per "
+                "week with your line manager's approval. "
+                "A third day would need additional approval "
+                "from HR, so please contact HR if you'd "
+                "like to request it."
+            )
+            reason = (
+                "Working 3 days a week remotely exceeds "
+                "the 2-day limit and requires HR approval "
+                "under section 3.2."
+            )
+        else:
+            answer = (
+                "You can work from home up to 2 days per "
+                "week with your line manager's approval. "
+                "Additional days require HR approval, "
+                "so please contact HR about your request."
+            )
+            reason = (
+                f"Working {days} days a week remotely "
+                "exceeds the 2-day limit and requires "
+                "HR approval under section 3.2."
+            )
+
+        return make_response(
+            answer=answer,
+            policy_section="3.2",
+            answer_found=True,
+            needs_human=True,
+            escalation_reason=reason
+        )
+
+    return make_response(
+        answer=(
+            "You can work from home up to 2 days per "
+            "week with your line manager's approval. "
+            "Additional days require HR approval."
+        ),
+        policy_section="3.2",
+        answer_found=True,
+        needs_human=False,
+        escalation_reason=""
+    )
+
+
+def sick_leave_answer(question):
+    q = normalize(question)
+
+    match = re.search(
+        r"\b(\d+)\s+(?:consecutive\s+)?days?\b",
+        q
+    )
+
+    if match:
+        days = int(match.group(1))
+
+        if days >= 2:
+            return make_response(
+                answer=(
+                    f"Yes. For an absence of {days} "
+                    "consecutive days, you must provide "
+                    "a medical certificate."
+                ),
+                policy_section="2.1",
+                answer_found=True,
+                needs_human=False,
+                escalation_reason=""
+            )
+
+        return make_response(
+            answer=(
+                "The policy requires a medical certificate "
+                "for absences of 2 or more consecutive days. "
+                "A one-day absence does not meet that "
+                "certificate requirement."
+            ),
+            policy_section="2.1",
+            answer_found=True,
+            needs_human=False,
+            escalation_reason=""
+        )
+
+    return make_response(
+        answer=(
+            "Employees receive 10 paid sick leave days "
+            "per year. A medical certificate is required "
+            "for absences of 2 or more consecutive days."
+        ),
+        policy_section="2.1",
+        answer_found=True,
+        needs_human=False,
+        escalation_reason=""
+    )
+
+
+# ============================================================
+# 7. DIRECT POLICY ANSWER ROUTER
+# ============================================================
+
+def direct_answer(question, ids):
+    q = normalize(question)
+
+    # Missing maternity policy.
+    if "maternity" in q:
+        return maternity_answer()
+
+    # Sensitive personal requests.
+    if requires_hr(question):
+        return make_response(
+            answer=(
+                "This request needs review by HR. "
+                "Please contact the HR department "
+                "for appropriate assistance."
+            ),
+            policy_section="",
+            answer_found=False,
+            needs_human=True,
+            escalation_reason=(
+                "This is a sensitive or personal HR request."
+            )
+        )
+
+    # Annual leave entitlement.
+    annual_terms = [
+        "how many",
+        "entitled",
+        "entitlement",
+        "number of",
+    ]
+
+    if (
+        "1.1" in ids
+        and len(ids) == 1
+        and any(term in q for term in annual_terms)
+    ):
+        return annual_leave_answer()
+
+    # Remote work.
+    if "3.2" in ids and len(ids) == 1:
+        match = re.search(
+            r"\b(\d+)\s+days?\b",
+            q
+        )
+
+        if match:
+            days = int(match.group(1))
+            return remote_work_answer(days)
+
+        if any(
+            term in q
+            for term in [
+                "how many",
+                "allowed",
+                "policy",
+                "can i work",
+            ]
+        ):
+            return remote_work_answer()
+
+    # Sick leave / medical certificate.
+    if "2.1" in ids and len(ids) == 1:
+        if any(
+            term in q
+            for term in [
+                "doctor",
+                "certificate",
+                "how many",
+                "sick leave",
+            ]
+        ):
+            return sick_leave_answer(question)
+
+    return None
+
+
+# ============================================================
+# 8. GEMINI API KEY
+# ============================================================
+
+def get_key():
+    try:
+        key = st.secrets.get(
+            "GEMINI_API_KEY",
+            ""
+        )
+
+        if key and str(key).strip():
+            return str(key).strip()
+
+    except Exception:
+        pass
+
+    return (
+        os.environ.get(
+            "GEMINI_API_KEY",
+            ""
+        ).strip()
+        or None
+    )
+
+
+# ============================================================
+# 9. BUILD GROUNDED GEMINI PROMPT
 # ============================================================
 
 def build_prompt(question, ids):
@@ -178,19 +477,41 @@ APPROVED HR POLICY:
 EMPLOYEE QUESTION:
 {question}
 
-INSTRUCTIONS:
+You must answer only using the approved HR policy.
 
-1. Answer only using the supplied HR policy.
-2. Use no more than three sentences.
-3. Cite the supporting policy section.
-4. Never invent policy information.
-5. Never guess numbers, dates or company rules.
-6. Escalate complaints, disputes, private employee
-   information and questions requiring system lookups.
-7. If the policy does not answer the question,
-   set answer_found to false and needs_human to true.
+DECISION RULES:
 
-Return ONLY valid JSON with exactly these five fields:
+1. If the policy answers the question completely:
+   answer_found = true
+   needs_human = false
+
+2. If the policy answers the question but additional
+   HR approval or intervention is required:
+   answer_found = true
+   needs_human = true
+
+3. If the policy does not answer the question:
+   answer_found = false
+   needs_human = true
+
+4. If answer_found is true, cite the supporting
+   policy section.
+
+5. If needs_human is true, explain the specific
+   reason in escalation_reason.
+
+6. Use clear, natural, professional HR wording.
+
+7. Do not invent leave entitlements, company rules,
+   approval requirements, or other policy information.
+
+8. Never claim to have checked employee records.
+
+9. Do not disclose private employee information.
+
+10. Return exactly five JSON fields.
+
+EXPECTED JSON STRUCTURE:
 
 {{
     "answer": "string",
@@ -200,53 +521,26 @@ Return ONLY valid JSON with exactly these five fields:
     "escalation_reason": "string"
 }}
 
-Use true and false as JSON Boolean values.
-
-If the question is answered, include the policy section.
-
-If the question cannot be answered, use an empty
-policy_section and explain the escalation reason.
-
+Return only JSON.
 Do not include Markdown or code fences.
 """
 
 
 # ============================================================
-# 6. GEMINI API KEY
-# ============================================================
-
-def get_key():
-    """
-    Read the API key securely from Streamlit Secrets
-    or environment variables.
-    """
-
-    try:
-        key = st.secrets.get("GEMINI_API_KEY", "")
-
-        if key and str(key).strip():
-            return str(key).strip()
-
-    except Exception:
-        pass
-
-    return (
-        os.environ.get("GEMINI_API_KEY", "").strip()
-        or None
-    )
-
-
-# ============================================================
-# 7. CALL GOOGLE GEMINI
+# 10. CALL GEMINI
 # ============================================================
 
 def call_model(prompt):
     api_key = get_key()
 
     if not api_key:
-        raise ValueError("GEMINI_API_KEY is missing")
+        raise ValueError(
+            "GEMINI_API_KEY is missing"
+        )
 
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(
+        api_key=api_key
+    )
 
     response = client.models.generate_content(
         model=MODEL,
@@ -266,20 +560,10 @@ def call_model(prompt):
 
 
 # ============================================================
-# 8. VALIDATE GEMINI RESPONSE
+# 11. VALIDATE GEMINI JSON
 # ============================================================
 
 def validate(question, raw, allowed):
-    """
-    Validate:
-    - JSON structure
-    - Required fields
-    - Policy section citations
-    - Numbers against approved policy
-    - Sensitive requests
-    """
-
-    # Parse JSON.
     try:
         text = raw.strip()
 
@@ -300,14 +584,12 @@ def validate(question, raw, allowed):
     except (ValueError, TypeError):
         return None, "Invalid JSON"
 
-    # Check structure.
     if not isinstance(data, dict):
         return None, "Incorrect JSON structure"
 
     if set(data.keys()) != set(FIELDS):
         return None, "Incorrect JSON fields"
 
-    # Check data types.
     for field in (
         "answer",
         "policy_section",
@@ -323,7 +605,6 @@ def validate(question, raw, allowed):
         if type(data[field]) is not bool:
             return None, "Incorrect JSON field types"
 
-    # Validate policy sections.
     if data["answer_found"]:
         cited = re.findall(
             r"\b\d+\.\d+\b",
@@ -339,10 +620,8 @@ def validate(question, raw, allowed):
         ):
             return None, "Unsupported policy section"
 
-        # Validate numbers.
         supported_text = (
-            question
-            + " "
+            question + " "
             + " ".join(POLICY[s] for s in cited)
         )
 
@@ -362,146 +641,98 @@ def validate(question, raw, allowed):
         ):
             return None, "Unsupported number in answer"
 
+        if not data["answer"].strip():
+            return None, "Empty answer"
+
     else:
+        data["policy_section"] = ""
         data["needs_human"] = True
 
-        if not data["escalation_reason"]:
+        if not data["escalation_reason"].strip():
             data["escalation_reason"] = (
-                "The approved HR policy does not "
+                "The approved policy does not "
                 "answer this question."
             )
 
-    # Sensitive requests require human review.
-    if requires_hr(question):
-        data["needs_human"] = True
+    if data["needs_human"]:
+        if not data["escalation_reason"].strip():
+            return None, "Missing escalation reason"
 
-        if not data["escalation_reason"]:
-            data["escalation_reason"] = (
-                "Human HR review required."
-            )
+    else:
+        data["escalation_reason"] = ""
 
     return data, None
 
 
 # ============================================================
-# 9. DIRECT ANNUAL LEAVE ANSWER
+# 12. MISSING POLICY RESPONSE
 # ============================================================
 
-def known_leave_answer(question, ids):
-    """
-    Return the required JSON response for straightforward
-    annual leave entitlement questions.
-    """
+def missing_policy_answer(question):
+    q = normalize(question)
 
-    q = question.lower()
+    # Specific maternity wording.
+    if "maternity" in q:
+        return maternity_answer()
 
-    if "1.1" not in ids:
-        return None
-
-    if requires_hr(question):
-        return None
-
-    excluded_terms = [
-        "sick",
-        "carry",
-        "notice",
-        "remaining",
-        "balance",
-        "request",
-        "approve",
-    ]
-
-    if any(term in q for term in excluded_terms):
-        return None
-
-    entitlement_terms = [
-        "how many",
-        "number of",
-        "entitled",
-        "entitlement",
-    ]
-
-    if any(term in q for term in entitlement_terms):
-        return make_response(
-            answer="You get 20 paid days per year.",
-            policy_section="1.1",
-            answer_found=True,
-            needs_human=False,
-            escalation_reason=""
+    # Generic response for other unsupported topics.
+    return make_response(
+        answer=(
+            "I could not find information about your "
+            "question in the approved HR policy provided "
+            "to me. Please contact HR for accurate details."
+        ),
+        policy_section="",
+        answer_found=False,
+        needs_human=True,
+        escalation_reason=(
+            f"The approved policy (version {POLICY_VERSION}) "
+            "does not contain information that answers "
+            "this question, so HR review is required."
         )
-
-    return None
+    )
 
 
 # ============================================================
-# 10. COMPLETE HR QUESTION WORKFLOW
+# 13. COMPLETE QUESTION WORKFLOW
 # ============================================================
 
 def answer_question(question):
-    """
-    1. Identify matching policies.
-    2. Check sensitive requests.
-    3. Answer known annual leave questions.
-    4. Ask Gemini for other policy questions.
-    5. Validate JSON.
-    6. Retry once if necessary.
-    """
-
     ids = pick_sections(question)
 
-    # Sensitive question.
-    if requires_hr(question):
-        return make_response(
-            answer="This request needs review by HR.",
-            policy_section="",
-            answer_found=False,
-            needs_human=True,
-            escalation_reason=(
-                "This is a sensitive or personal HR request."
-            )
-        ), None
-
-    # No matching policy.
-    if not ids:
-        return make_response(
-            answer=(
-                "The available policy does not "
-                "cover this question."
-            ),
-            policy_section="",
-            answer_found=False,
-            needs_human=True,
-            escalation_reason=(
-                "No matching approved policy section."
-            )
-        ), None
-
-    # Direct annual leave answer.
-    direct = known_leave_answer(question, ids)
+    # First check deterministic policy answers.
+    direct = direct_answer(question, ids)
 
     if direct is not None:
         return direct, None
 
-    # Other questions go to Gemini.
+    # Missing policy: do not invent an answer.
+    if not ids:
+        return missing_policy_answer(question), None
+
+    # Ask Gemini for other supported topics.
     prompt = build_prompt(question, ids)
 
     problem = "No response"
 
     for attempt in range(2):
         try:
-            if attempt == 0:
-                raw = call_model(prompt)
-            else:
-                raw = call_model(
-                    prompt
-                    + "\nReturn valid JSON with "
-                    + "correct policy citations."
+            retry_prompt = prompt
+
+            if attempt == 1:
+                retry_prompt += (
+                    "\nEnsure your response uses "
+                    "exactly five JSON fields and "
+                    "correct policy citations."
                 )
+
+            raw = call_model(retry_prompt)
 
         except Exception as error:
             return None, (
                 "Gemini API error: "
-                f"{type(error).__name__}"
+                f"{type(error).__name__}. "
+                "Check the Streamlit Cloud logs."
             )
 
         data, problem = validate(
@@ -520,14 +751,10 @@ def answer_question(question):
 
 
 # ============================================================
-# 11. HR ESCALATION QUEUE
+# 14. HR ESCALATION QUEUE
 # ============================================================
 
 def hr_message(question, data):
-    """
-    Create a demonstration HR queue message.
-    """
-
     return (
         f"Employee question: {question}\n"
         f"Escalation reason: "
@@ -538,33 +765,23 @@ def hr_message(question, data):
 
 
 # ============================================================
-# 12. STREAMLIT APPLICATION
+# 15. STREAMLIT APPLICATION
 # ============================================================
 
 def main():
-    st.set_page_config(page_title="Meridian HR assistant")
-    st.title("Meridian HR assistant")
-    st.caption(f"Fictional company. Answers come only from policy version {POLICY_VERSION}.")
+    st.set_page_config(
+        page_title="Meridian HR Assistant",
+        page_icon="💬"
+    )
 
-    # --------------------------------------------------------
-    # CHECK API KEY
-    # --------------------------------------------------------
+    st.title("Meridian HR Assistant")
 
-    if not get_key():
-        st.error("Gemini API key not detected.")
+    st.caption(
+        "Fictional company. Answers come only from "
+        f"policy version {POLICY_VERSION}."
+    )
 
-        st.info(
-            "Open your app's Streamlit Community Cloud "
-            "Settings → Secrets and add GEMINI_API_KEY. "
-            "Save and reboot the application."
-        )
-
-        st.stop()
-
-    # --------------------------------------------------------
-    # INITIALIZE SESSION STATE
-    # --------------------------------------------------------
-
+    # Initialize session state.
     if "chat" not in st.session_state:
         st.session_state.chat = []
 
@@ -574,10 +791,7 @@ def main():
     if "last" not in st.session_state:
         st.session_state.last = None
 
-    # --------------------------------------------------------
-    # DISPLAY CHAT HISTORY AS JSON
-    # --------------------------------------------------------
-
+    # Display chat history.
     for role, message in st.session_state.chat:
         with st.chat_message(role):
             if role == "assistant":
@@ -588,11 +802,10 @@ def main():
             else:
                 st.write(message)
 
-    # --------------------------------------------------------
-    # EMPLOYEE QUESTION
-    # --------------------------------------------------------
-
-    question = st.chat_input("Ask an HR question")
+    # Employee question input.
+    question = st.chat_input(
+        "Ask an HR question"
+    )
 
     if question:
         st.session_state.chat.append(
@@ -602,19 +815,18 @@ def main():
         with st.chat_message("user"):
             st.write(question)
 
-        # Process employee question.
-        with st.spinner("Checking approved HR policy..."):
+        # Process question.
+        with st.spinner(
+            "Checking approved HR policy..."
+        ):
             data, problem = answer_question(question)
 
-        # ----------------------------------------------------
-        # HANDLE TECHNICAL ERRORS
-        # ----------------------------------------------------
-
+        # Technical errors are separate from HR cases.
         if problem:
             data = make_response(
                 answer=(
                     "I could not complete the policy check "
-                    "due to a technical issue. "
+                    "because of a technical issue. "
                     "Please try again."
                 ),
                 policy_section="",
@@ -626,7 +838,6 @@ def main():
             st.error(problem)
 
         elif data is not None:
-            # Add genuine HR escalations to demonstration queue.
             if data["needs_human"]:
                 st.session_state.queue.append(
                     hr_message(question, data)
@@ -648,20 +859,14 @@ def main():
             ("assistant", data)
         )
 
-        # ----------------------------------------------------
-        # DISPLAY ALL FIVE JSON FIELDS
-        # ----------------------------------------------------
-
+        # Display JSON.
         with st.chat_message("assistant"):
             st.code(
                 format_json(data),
                 language="json"
             )
 
-    # --------------------------------------------------------
-    # HR ESCALATION SIDEBAR
-    # --------------------------------------------------------
-
+    # Sidebar.
     with st.sidebar:
         st.header("HR Queue")
 
@@ -674,17 +879,27 @@ def main():
             st.write("Nothing escalated yet.")
 
         for message in st.session_state.queue:
-            st.code(message, language=None)
+            st.code(
+                message,
+                language=None
+            )
 
         with st.expander("Last structured answer"):
-            st.json(st.session_state.last or {})
+            st.json(
+                st.session_state.last or {}
+            )
+
+        if st.button("Clear chat history"):
+            st.session_state.chat = []
+            st.session_state.queue = []
+            st.session_state.last = None
+            st.rerun()
 
 
 # ============================================================
-# 13. START APPLICATION
+# 16. START APPLICATION
 # ============================================================
 
 if __name__ == "__main__":
     main()
-
 
