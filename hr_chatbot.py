@@ -382,18 +382,13 @@ def hr_message(question, data, problem=None):
 
 def get_key():
     """Read the Gemini API key securely."""
-
-    key = os.environ.get("GEMINI_API_KEY")
-
-    if key:
-        return key
-
     try:
-        return st.secrets["GEMINI_API_KEY"]
-
-    except (KeyError, FileNotFoundError):
-        return None
-
+        key = st.secrets.get("GEMINI_API_KEY", "")
+        if key and str(key).strip():
+            return str(key).strip()
+    except Exception:
+        pass
+    return os.environ.get("GEMINI_API_KEY", "").strip() or None    
 
 def call_model(prompt):
     """Send the prompt to Google Gemini."""
