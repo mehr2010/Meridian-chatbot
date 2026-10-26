@@ -1,6 +1,6 @@
 # Meridian HR chatbot (training project)
 
-A small HR chatbot built in the AI Datayard, AI Automation Bootcamp, Module 2.
+A small HR chatbot built in the AI DataYard AI Automation Bootcamp, Module 2.
 It answers employee questions from a fictional company policy using GEMINI , checks each answer
 with validation rules, and sends anything sensitive or unclear to an HR queue.
 
